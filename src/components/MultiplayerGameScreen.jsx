@@ -143,7 +143,7 @@ function ChoosingPhase({ room, roomCode, playerRole }) {
   if (myMove) {
     return (
       <div className="mp-waiting">
-        <p className="move-prompt">MOVE LOCKED IN</p>
+        <p className="move-prompt" style={{ marginTop: 0 }}>MOVE LOCKED IN</p>
         <MoveIcon move={myMove} size={64} />
         <p className="section-label" style={{ marginTop: 16 }}>WAITING FOR OPPONENT...</p>
       </div>
