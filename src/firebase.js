@@ -22,13 +22,14 @@ import { getDatabase } from 'firebase/database'
 // ---------------------------------------------------------------------------
 
 const firebaseConfig = {
-  apiKey: 'YOUR_API_KEY',
-  authDomain: 'YOUR_PROJECT_ID.firebaseapp.com',
-  databaseURL: 'https://YOUR_PROJECT_ID-default-rtdb.firebaseio.com',
-  projectId: 'YOUR_PROJECT_ID',
-  storageBucket: 'YOUR_PROJECT_ID.appspot.com',
-  messagingSenderId: 'YOUR_SENDER_ID',
-  appId: 'YOUR_APP_ID',
+  apiKey: "AIzaSyBdsNCk9HApTIPwjrnU-AF2vqEBBR6Pmd8",
+  authDomain: "proshambo-12480.firebaseapp.com",
+  databaseURL: "https://proshambo-12480-default-rtdb.firebaseio.com",
+  projectId: "proshambo-12480",
+  storageBucket: "proshambo-12480.firebasestorage.app",
+  messagingSenderId: "75777262105",
+  appId: "1:75777262105:web:d90c088228feea9483a088",
+  measurementId: "G-VPKXY5S0F8"
 }
 
 const app = initializeApp(firebaseConfig)
