@@ -83,7 +83,7 @@ function CharacterSelectPhase({ room, roomCode, playerRole }) {
   const oppConfirmed = oppChar !== null
 
   return (
-    <div className="screen" style={{ minHeight: 0 }}>
+    <>
       {waiting && playerRole === 'p1' && (
         <div className="room-code-banner">
           <span className="section-label">ROOM CODE</span>
@@ -124,7 +124,7 @@ function CharacterSelectPhase({ room, roomCode, playerRole }) {
           {saving ? 'CONFIRMING...' : 'CONFIRM'}
         </RetroButton>
       )}
-    </div>
+    </>
   )
 }
 
