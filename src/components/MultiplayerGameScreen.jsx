@@ -5,6 +5,7 @@ import {
   subscribeToRoom, setCharacter, startGame,
   submitMove, resolveRound, advanceRound, rematch, deleteRoom,
 } from '../game/room.js'
+import { recordOnlineMatch } from '../game/stats.js'
 
 // ── Shared helpers ────────────────────────────────────────────────────────
 
@@ -217,6 +218,15 @@ function MatchOverPhase({ room, roomCode, playerRole, isP1, onLeave }) {
   const base = import.meta.env.BASE_URL
   const playerWon = room.matchWinner === playerRole
   const [rematching, setRematching] = useState(false)
+  const recorded = useRef(false)
+
+  useEffect(() => {
+    if (recorded.current) return
+    recorded.current = true
+    const myScore  = playerRole === 'p1' ? room.p1Score : room.p2Score
+    const oppScore = playerRole === 'p1' ? room.p2Score : room.p1Score
+    recordOnlineMatch(playerWon ? 'WIN' : 'LOSS', myScore, oppScore)
+  }, [])
 
   async function handleRematch() {
     setRematching(true)

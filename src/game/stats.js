@@ -12,6 +12,8 @@ export function getStats() {
   return {
     vsCpuWins: p.vsCpuWins || 0,
     vsCpuLosses: p.vsCpuLosses || 0,
+    onlineWins: p.onlineWins || 0,
+    onlineLosses: p.onlineLosses || 0,
   }
 }
 
@@ -27,17 +29,42 @@ export function recordMatch(winner, playerScore, cpuScore) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
 }
 
+export function recordOnlineMatch(outcome, myScore, oppScore) {
+  const p = loadPrefs()
+  if (outcome === 'WIN') p.onlineWins = (p.onlineWins || 0) + 1
+  else p.onlineLosses = (p.onlineLosses || 0) + 1
+  localStorage.setItem(PREFS_KEY, JSON.stringify(p))
+
+  const history = loadHistory()
+  history.unshift(`ONLINE|${outcome}|${myScore}|${oppScore}|${Date.now()}`)
+  if (history.length > MAX_HISTORY) history.length = MAX_HISTORY
+  localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
+}
+
 export function loadHistory() {
   try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]') }
   catch { return [] }
 }
 
 export function parseHistoryEntry(entry) {
-  const [winner, playerScore, cpuScore, ts] = entry.split('|')
+  const parts = entry.split('|')
+  if (parts[0] === 'ONLINE') {
+    const [, outcome, myScore, oppScore, ts] = parts
+    return {
+      mode: 'ONLINE',
+      outcome,
+      myScore: parseInt(myScore),
+      oppScore: parseInt(oppScore),
+      date: new Date(parseInt(ts)).toLocaleDateString(),
+    }
+  }
+  // Legacy VS CPU format: winner|playerScore|cpuScore|timestamp
+  const [winner, playerScore, cpuScore, ts] = parts
   return {
-    winner,
-    playerScore: parseInt(playerScore),
-    cpuScore: parseInt(cpuScore),
+    mode: 'VS_CPU',
+    outcome: winner === 'PLAYER_WINS' ? 'WIN' : 'LOSS',
+    myScore: parseInt(playerScore),
+    oppScore: parseInt(cpuScore),
     date: new Date(parseInt(ts)).toLocaleDateString(),
   }
 }

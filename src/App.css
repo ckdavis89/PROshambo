@@ -480,6 +480,13 @@ body {
 }
 .history-result--win  { color: var(--win-gold); }
 .history-result--lose { color: var(--lose-red); }
+.history-mode {
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--silver-muted);
+  text-transform: uppercase;
+}
 .history-score {
   font-size: 15px;
   font-weight: 700;

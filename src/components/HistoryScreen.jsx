@@ -1,8 +1,34 @@
 import { getStats, loadHistory, parseHistoryEntry } from '../game/stats.js'
 import RetroButton from './RetroButton.jsx'
 
+function WinRate({ wins, losses }) {
+  const total = wins + losses
+  return total === 0 ? '—' : Math.round((wins / total) * 100) + '%'
+}
+
+function StatsBlock({ wins, losses }) {
+  return (
+    <div className="stats-row">
+      <div className="stat-item">
+        <span className="stat-value">{wins}</span>
+        <span className="stat-label">WINS</span>
+      </div>
+      <div className="stat-item">
+        <span className="stat-value" style={{ color: 'var(--lose-red)' }}>{losses}</span>
+        <span className="stat-label">LOSSES</span>
+      </div>
+      <div className="stat-item">
+        <span className="stat-value" style={{ color: 'var(--silver-accent)' }}>
+          <WinRate wins={wins} losses={losses} />
+        </span>
+        <span className="stat-label">WIN RATE</span>
+      </div>
+    </div>
+  )
+}
+
 export default function HistoryScreen({ onBack }) {
-  const { vsCpuWins, vsCpuLosses } = getStats()
+  const { vsCpuWins, vsCpuLosses, onlineWins, onlineLosses } = getStats()
   const history = loadHistory().map(parseHistoryEntry)
 
   return (
@@ -16,24 +42,13 @@ export default function HistoryScreen({ onBack }) {
       </h2>
       <hr className="gold-divider" />
 
-      <div className="stats-row">
-        <div className="stat-item">
-          <span className="stat-value">{vsCpuWins}</span>
-          <span className="stat-label">WINS</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-value" style={{ color: 'var(--lose-red)' }}>{vsCpuLosses}</span>
-          <span className="stat-label">LOSSES</span>
-        </div>
-        <div className="stat-item">
-          <span className="stat-value" style={{ color: 'var(--silver-accent)' }}>
-            {vsCpuWins + vsCpuLosses === 0
-              ? '—'
-              : Math.round((vsCpuWins / (vsCpuWins + vsCpuLosses)) * 100) + '%'}
-          </span>
-          <span className="stat-label">WIN RATE</span>
-        </div>
-      </div>
+      <p className="section-label" style={{ marginBottom: 6 }}>VS CPU</p>
+      <StatsBlock wins={vsCpuWins} losses={vsCpuLosses} />
+
+      <p className="section-label" style={{ marginTop: 16, marginBottom: 6 }}>ONLINE</p>
+      <StatsBlock wins={onlineWins} losses={onlineLosses} />
+
+      <hr className="gold-divider" style={{ marginTop: 16 }} />
 
       {history.length === 0 ? (
         <p className="history-empty">NO MATCHES YET</p>
@@ -42,14 +57,15 @@ export default function HistoryScreen({ onBack }) {
           {history.map((entry, i) => (
             <div
               key={i}
-              className={`history-item history-item--${entry.winner === 'PLAYER_WINS' ? 'win' : 'lose'}`}
+              className={`history-item history-item--${entry.outcome === 'WIN' ? 'win' : 'lose'}`}
             >
-              <span className={`history-result history-result--${entry.winner === 'PLAYER_WINS' ? 'win' : 'lose'}`}>
-                {entry.winner === 'PLAYER_WINS' ? 'WIN' : 'LOSS'}
-              </span>
-              <span className="history-score">
-                {entry.playerScore} — {entry.cpuScore}
-              </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                <span className={`history-result history-result--${entry.outcome === 'WIN' ? 'win' : 'lose'}`}>
+                  {entry.outcome}
+                </span>
+                <span className="history-mode">{entry.mode === 'ONLINE' ? 'ONLINE' : 'VS CPU'}</span>
+              </div>
+              <span className="history-score">{entry.myScore} — {entry.oppScore}</span>
               <span className="history-date">{entry.date}</span>
             </div>
           ))}
