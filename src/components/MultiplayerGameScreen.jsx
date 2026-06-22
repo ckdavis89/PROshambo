@@ -69,7 +69,7 @@ function CharacterSelectPhase({ room, roomCode, playerRole }) {
   const base = import.meta.env.BASE_URL
   const myChar = playerRole === 'p1' ? room.p1Character : room.p2Character
   const oppChar = playerRole === 'p1' ? room.p2Character : room.p1Character
-  const [selected, setSelected] = useState(myChar)
+  const [selected, setSelected] = useState(myChar >= 0 ? myChar : null)
   const [saving, setSaving] = useState(false)
 
   async function handleConfirm() {
@@ -79,8 +79,8 @@ function CharacterSelectPhase({ room, roomCode, playerRole }) {
   }
 
   const waiting = room.phase === 'waiting'
-  const iConfirmed = myChar !== null
-  const oppConfirmed = oppChar !== null
+  const iConfirmed = myChar >= 0
+  const oppConfirmed = oppChar >= 0
 
   return (
     <>
@@ -267,7 +267,7 @@ export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave })
   // P1 only: start game when both characters are set
   useEffect(() => {
     if (!room || !isP1) return
-    if (room.phase === 'character_select' && room.p1Character !== null && room.p2Character !== null) {
+    if (room.phase === 'character_select' && room.p1Character >= 0 && room.p2Character >= 0) {
       startGame(roomCode)
     }
   }, [room?.p1Character, room?.p2Character, room?.phase])

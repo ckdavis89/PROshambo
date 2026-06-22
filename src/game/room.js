@@ -26,8 +26,8 @@ export async function createRoom(bestOf) {
     matchTarget: Math.ceil(bestOf / 2),
     createdAt: Date.now(),
     phase: 'waiting',
-    p1Character: null,
-    p2Character: null,
+    p1Character: -1,
+    p2Character: -1,
     p1Score: 0,
     p2Score: 0,
     roundNumber: 1,
@@ -85,8 +85,8 @@ export async function advanceRound(code, roundNumber) {
 export async function rematch(code, bestOf) {
   await update(ref(db, `rooms/${code}`), {
     phase: 'character_select',
-    p1Character: null,
-    p2Character: null,
+    p1Character: -1,
+    p2Character: -1,
     p1Score: 0,
     p2Score: 0,
     roundNumber: 1,
