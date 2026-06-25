@@ -78,14 +78,14 @@ function CountdownDisplay({ value }) {
   )
 }
 
-function MoveGifReveal({ move, label, bust, direction }) {
+function MoveGifReveal({ move, label, gifKey, direction }) {
   const base = import.meta.env.BASE_URL
   const gif = MOVES[move]?.gif
   if (!gif) return null
   return (
     <div className={`gif-reveal gif-reveal--${direction}`}>
       <span className="gif-reveal-label">{label}</span>
-      <img className="move-gif" src={`${base}${gif}?${bust}`} alt={MOVES[move]?.name} />
+      <img key={gifKey} className="move-gif" src={`${base}${gif}`} alt={MOVES[move]?.name} />
       <span className="gif-reveal-name">{MOVES[move]?.name}</span>
     </div>
   )
@@ -178,6 +178,14 @@ export default function GameScreen({ state, audio, onPlayerChooses, onNextRound,
   const [headerScores, setHeaderScores] = useState({ player: 0, cpu: 0 })
   const [gifBust, setGifBust] = useState(0)
 
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL
+    MOVE_KEYS.forEach(key => {
+      const gif = MOVES[key]?.gif
+      if (gif) new Image().src = `${base}${gif}`
+    })
+  }, [])
+
   useLayoutEffect(() => {
     if (state.roundState === 'PLAYER_CHOOSING') {
       setHeaderScores({ player: state.playerScore, cpu: state.cpuScore })
@@ -230,11 +238,11 @@ export default function GameScreen({ state, audio, onPlayerChooses, onNextRound,
       )}
 
       {phase === 'player_gif' && (
-        <MoveGifReveal move={state.playerMove} label="YOU CHOSE" bust={`p${gifBust}`} direction="left" />
+        <MoveGifReveal move={state.playerMove} label="YOU CHOSE" gifKey={`p${gifBust}`} direction="left" />
       )}
 
       {phase === 'cpu_gif' && (
-        <MoveGifReveal move={state.cpuMove} label="CPU CHOSE" bust={`c${gifBust}`} direction="right" />
+        <MoveGifReveal move={state.cpuMove} label="CPU CHOSE" gifKey={`c${gifBust}`} direction="right" />
       )}
 
       {showResult && !state.matchWinner && (

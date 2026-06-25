@@ -170,14 +170,14 @@ function ChoosingPhase({ room, roomCode, playerRole }) {
 
 // ── GIF reveal helper ────────────────────────────────────────────────────
 
-function MoveGifReveal({ move, label, bust, direction }) {
+function MoveGifReveal({ move, label, gifKey, direction }) {
   const base = import.meta.env.BASE_URL
   const gif = MOVES[move]?.gif
   if (!gif) return null
   return (
     <div className={`gif-reveal gif-reveal--${direction}`}>
       <span className="gif-reveal-label">{label}</span>
-      <img className="move-gif" src={`${base}${gif}?${bust}`} alt={MOVES[move]?.name} />
+      <img key={gifKey} className="move-gif" src={`${base}${gif}`} alt={MOVES[move]?.name} />
       <span className="gif-reveal-name">{MOVES[move]?.name}</span>
     </div>
   )
@@ -218,11 +218,11 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
   }
 
   if (phase === 'player_gif') {
-    return <MoveGifReveal move={myMove} label="YOU CHOSE" bust={`p${room.roundNumber}`} direction="left" />
+    return <MoveGifReveal move={myMove} label="YOU CHOSE" gifKey={`p${room.roundNumber}`} direction="left" />
   }
 
   if (phase === 'opp_gif') {
-    return <MoveGifReveal move={oppMove} label="OPP CHOSE" bust={`c${room.roundNumber}`} direction="right" />
+    return <MoveGifReveal move={oppMove} label="OPP CHOSE" gifKey={`c${room.roundNumber}`} direction="right" />
   }
 
   return (
@@ -311,6 +311,14 @@ export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave })
   const resolving = useRef(false)
 
   useEffect(() => subscribeToRoom(roomCode, setRoom), [roomCode])
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL
+    MOVE_KEYS.forEach(key => {
+      const gif = MOVES[key]?.gif
+      if (gif) new Image().src = `${base}${gif}`
+    })
+  }, [])
 
   // P1 only: start game when both characters are set
   useEffect(() => {
