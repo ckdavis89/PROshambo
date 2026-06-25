@@ -277,6 +277,50 @@ body {
   gap: 8px;
   flex: 1;
 }
+@keyframes slide-from-left {
+  from { transform: translateX(-100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slide-from-right {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.gif-reveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  justify-content: center;
+  overflow: hidden;
+}
+.gif-reveal--left {
+  animation: slide-from-left 0.4s ease-out;
+}
+.gif-reveal--right {
+  animation: slide-from-right 0.4s ease-out;
+}
+.gif-reveal-label {
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--silver-muted);
+  text-transform: uppercase;
+}
+.gif-reveal-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--gold);
+  text-transform: uppercase;
+}
+.move-gif {
+  width: 100%;
+  max-width: 280px;
+  height: auto;
+  border-radius: 8px;
+  border: 2px solid var(--gold);
+}
 .move-reveal-label {
   font-size: 10px;
   font-weight: 700;

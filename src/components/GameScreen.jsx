@@ -78,6 +78,19 @@ function CountdownDisplay({ value }) {
   )
 }
 
+function MoveGifReveal({ move, label, bust, direction }) {
+  const base = import.meta.env.BASE_URL
+  const gif = MOVES[move]?.gif
+  if (!gif) return null
+  return (
+    <div className={`gif-reveal gif-reveal--${direction}`}>
+      <span className="gif-reveal-label">{label}</span>
+      <img className="move-gif" src={`${base}${gif}?${bust}`} alt={MOVES[move]?.name} />
+      <span className="gif-reveal-name">{MOVES[move]?.name}</span>
+    </div>
+  )
+}
+
 function RoundResultDisplay({ roundResult, playerMove, cpuMove, currentStreak, streakIsPlayer }) {
   const headlineClass =
     roundResult === 'PLAYER_WINS' ? 'result-headline--win' :
@@ -158,40 +171,54 @@ function MatchOverDisplay({ matchWinner, playerScore, cpuScore, matchTarget, pla
   )
 }
 
+// Phases: 'countdown' → 'player_gif' → 'cpu_gif' → null (result)
 export default function GameScreen({ state, audio, onPlayerChooses, onNextRound, onRematch, onMenu }) {
-  const [showingCountdown, setShowingCountdown] = useState(false)
+  const [phase, setPhase] = useState(null)
   const [countdownValue, setCountdownValue] = useState(3)
   const [headerScores, setHeaderScores] = useState({ player: 0, cpu: 0 })
 
-  // Runs synchronously before browser paint — prevents one-frame result flash
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL
+    MOVE_KEYS.forEach(key => {
+      const gif = MOVES[key]?.gif
+      if (!gif) return
+      new Image().src = `${base}${gif}?p`
+      new Image().src = `${base}${gif}?c`
+    })
+  }, [])
+
   useLayoutEffect(() => {
     if (state.roundState === 'PLAYER_CHOOSING') {
       setHeaderScores({ player: state.playerScore, cpu: state.cpuScore })
     } else if (state.roundState === 'SHOWING_RESULT') {
-      setShowingCountdown(true)
+      setPhase('countdown')
       setCountdownValue(3)
     }
   }, [state.roundState]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Start countdown timers after the layout is committed
   useEffect(() => {
     if (state.roundState !== 'SHOWING_RESULT') return
-    const t1 = setTimeout(() => setCountdownValue(2), 600)
-    const t2 = setTimeout(() => setCountdownValue(1), 1200)
-    const t3 = setTimeout(() => {
-      setShowingCountdown(false)
-      setHeaderScores({ player: state.playerScore, cpu: state.cpuScore })
-      if (state.matchWinner === 'PLAYER_WINS' || state.roundResult === 'PLAYER_WINS') audio.onWin()
-      else if (state.matchWinner === 'CPU_WINS' || state.roundResult === 'CPU_WINS') audio.onLose()
-      else audio.onDraw()
-    }, 1800)
-    return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-  // audio is stable; omitting avoids restarting timers on unrelated renders
+    const playerGifDur = MOVES[state.playerMove]?.gifDuration ?? 3000
+    const cpuGifDur = MOVES[state.cpuMove]?.gifDuration ?? 3000
+    const timers = [
+      setTimeout(() => setCountdownValue(2), 600),
+      setTimeout(() => setCountdownValue(1), 1200),
+      setTimeout(() => setPhase('player_gif'), 1800),
+      setTimeout(() => setPhase('cpu_gif'), 1800 + playerGifDur),
+      setTimeout(() => {
+        setPhase(null)
+        setHeaderScores({ player: state.playerScore, cpu: state.cpuScore })
+        if (state.matchWinner === 'PLAYER_WINS' || state.roundResult === 'PLAYER_WINS') audio.onWin()
+        else if (state.matchWinner === 'CPU_WINS' || state.roundResult === 'CPU_WINS') audio.onLose()
+        else audio.onDraw()
+      }, 1800 + playerGifDur + cpuGifDur),
+    ]
+    return () => timers.forEach(clearTimeout)
   }, [state.roundState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const playerWrestler = state.playerCharacter + 1
   const cpuWrestler = state.cpuCharacter + 1
-  const showResult = state.roundState === 'SHOWING_RESULT' && !showingCountdown
+  const showResult = state.roundState === 'SHOWING_RESULT' && phase === null
 
   return (
     <div className="screen">
@@ -206,8 +233,16 @@ export default function GameScreen({ state, audio, onPlayerChooses, onNextRound,
         <MoveChooser onChoose={onPlayerChooses} />
       )}
 
-      {state.roundState === 'SHOWING_RESULT' && showingCountdown && (
+      {phase === 'countdown' && (
         <CountdownDisplay value={countdownValue} />
+      )}
+
+      {phase === 'player_gif' && (
+        <MoveGifReveal move={state.playerMove} label="YOU CHOSE" bust="p" direction="left" />
+      )}
+
+      {phase === 'cpu_gif' && (
+        <MoveGifReveal move={state.cpuMove} label="CPU CHOSE" bust="c" direction="right" />
       )}
 
       {showResult && !state.matchWinner && (

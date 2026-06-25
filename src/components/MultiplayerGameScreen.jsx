@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import RetroButton from './RetroButton.jsx'
 import { MOVES, MOVE_KEYS } from '../game/moves.js'
 import {
@@ -168,12 +168,42 @@ function ChoosingPhase({ room, roomCode, playerRole }) {
   )
 }
 
+// ── GIF reveal helper ────────────────────────────────────────────────────
+
+function MoveGifReveal({ move, label, bust, direction }) {
+  const base = import.meta.env.BASE_URL
+  const gif = MOVES[move]?.gif
+  if (!gif) return null
+  return (
+    <div className={`gif-reveal gif-reveal--${direction}`}>
+      <span className="gif-reveal-label">{label}</span>
+      <img className="move-gif" src={`${base}${gif}?${bust}`} alt={MOVES[move]?.name} />
+      <span className="gif-reveal-name">{MOVES[move]?.name}</span>
+    </div>
+  )
+}
+
 // ── Round: revealing ──────────────────────────────────────────────────────
 
 function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
   const { p1Move, p2Move, result } = room.round
   const myMove  = playerRole === 'p1' ? p1Move : p2Move
   const oppMove = playerRole === 'p1' ? p2Move : p1Move
+  const [phase, setPhase] = useState('player_gif')
+
+  useLayoutEffect(() => {
+    setPhase('player_gif')
+  }, [room.roundNumber])
+
+  useEffect(() => {
+    const myDur  = MOVES[myMove]?.gifDuration ?? 3000
+    const oppDur = MOVES[oppMove]?.gifDuration ?? 3000
+    const timers = [
+      setTimeout(() => setPhase('opp_gif'), myDur),
+      setTimeout(() => setPhase('result'), myDur + oppDur),
+    ]
+    return () => timers.forEach(clearTimeout)
+  }, [room.roundNumber]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const outcome =
     result === 'draw'    ? 'draw' :
@@ -185,6 +215,14 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
 
   async function handleNext() {
     await advanceRound(roomCode, room.roundNumber)
+  }
+
+  if (phase === 'player_gif') {
+    return <MoveGifReveal move={myMove} label="YOU CHOSE" bust="p" direction="left" />
+  }
+
+  if (phase === 'opp_gif') {
+    return <MoveGifReveal move={oppMove} label="OPP CHOSE" bust="c" direction="right" />
   }
 
   return (
@@ -273,6 +311,16 @@ export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave })
   const resolving = useRef(false)
 
   useEffect(() => subscribeToRoom(roomCode, setRoom), [roomCode])
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL
+    MOVE_KEYS.forEach(key => {
+      const gif = MOVES[key]?.gif
+      if (!gif) return
+      new Image().src = `${base}${gif}?p`
+      new Image().src = `${base}${gif}?c`
+    })
+  }, [])
 
   // P1 only: start game when both characters are set
   useEffect(() => {
