@@ -176,16 +176,7 @@ export default function GameScreen({ state, audio, onPlayerChooses, onNextRound,
   const [phase, setPhase] = useState(null)
   const [countdownValue, setCountdownValue] = useState(3)
   const [headerScores, setHeaderScores] = useState({ player: 0, cpu: 0 })
-
-  useEffect(() => {
-    const base = import.meta.env.BASE_URL
-    MOVE_KEYS.forEach(key => {
-      const gif = MOVES[key]?.gif
-      if (!gif) return
-      new Image().src = `${base}${gif}?p`
-      new Image().src = `${base}${gif}?c`
-    })
-  }, [])
+  const [gifBust, setGifBust] = useState(0)
 
   useLayoutEffect(() => {
     if (state.roundState === 'PLAYER_CHOOSING') {
@@ -193,6 +184,7 @@ export default function GameScreen({ state, audio, onPlayerChooses, onNextRound,
     } else if (state.roundState === 'SHOWING_RESULT') {
       setPhase('countdown')
       setCountdownValue(3)
+      setGifBust(prev => prev + 1)
     }
   }, [state.roundState]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -238,11 +230,11 @@ export default function GameScreen({ state, audio, onPlayerChooses, onNextRound,
       )}
 
       {phase === 'player_gif' && (
-        <MoveGifReveal move={state.playerMove} label="YOU CHOSE" bust="p" direction="left" />
+        <MoveGifReveal move={state.playerMove} label="YOU CHOSE" bust={`p${gifBust}`} direction="left" />
       )}
 
       {phase === 'cpu_gif' && (
-        <MoveGifReveal move={state.cpuMove} label="CPU CHOSE" bust="c" direction="right" />
+        <MoveGifReveal move={state.cpuMove} label="CPU CHOSE" bust={`c${gifBust}`} direction="right" />
       )}
 
       {showResult && !state.matchWinner && (

@@ -218,11 +218,11 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
   }
 
   if (phase === 'player_gif') {
-    return <MoveGifReveal move={myMove} label="YOU CHOSE" bust="p" direction="left" />
+    return <MoveGifReveal move={myMove} label="YOU CHOSE" bust={`p${room.roundNumber}`} direction="left" />
   }
 
   if (phase === 'opp_gif') {
-    return <MoveGifReveal move={oppMove} label="OPP CHOSE" bust="c" direction="right" />
+    return <MoveGifReveal move={oppMove} label="OPP CHOSE" bust={`c${room.roundNumber}`} direction="right" />
   }
 
   return (
@@ -311,16 +311,6 @@ export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave })
   const resolving = useRef(false)
 
   useEffect(() => subscribeToRoom(roomCode, setRoom), [roomCode])
-
-  useEffect(() => {
-    const base = import.meta.env.BASE_URL
-    MOVE_KEYS.forEach(key => {
-      const gif = MOVES[key]?.gif
-      if (!gif) return
-      new Image().src = `${base}${gif}?p`
-      new Image().src = `${base}${gif}?c`
-    })
-  }, [])
 
   // P1 only: start game when both characters are set
   useEffect(() => {
