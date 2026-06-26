@@ -1,6 +1,7 @@
-import { useState, useEffect, useLayoutEffect } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import RetroButton from './RetroButton.jsx'
 import { MOVES, MOVE_KEYS } from '../game/moves.js'
+import { cachedSrc } from '../game/imageCache.js'
 
 function MoveIcon({ move, size = 40 }) {
   const path = MOVES[move]?.svgPath
@@ -25,7 +26,7 @@ function ScoreHeader({ playerScore, cpuScore, playerWrestler, cpuWrestler }) {
       <div className="score-player">
         <img
           className="score-icon"
-          src={`${base}images/wrestler_${playerWrestler}_icon.jpeg`}
+          src={cachedSrc(`${base}images/wrestler_${playerWrestler}_icon.jpeg`)}
           alt="You"
           style={playerFlipped ? { transform: 'scaleX(-1)' } : undefined}
         />
@@ -38,7 +39,7 @@ function ScoreHeader({ playerScore, cpuScore, playerWrestler, cpuWrestler }) {
       <div className="score-player score-player--cpu">
         <img
           className="score-icon"
-          src={`${base}images/wrestler_${cpuWrestler}_icon.jpeg`}
+          src={cachedSrc(`${base}images/wrestler_${cpuWrestler}_icon.jpeg`)}
           alt="CPU"
           style={cpuFlipped ? { transform: 'scaleX(-1)' } : undefined}
         />
@@ -69,6 +70,19 @@ function MoveChooser({ onChoose }) {
   )
 }
 
+const videoBlobCache = {}
+
+function getVideoBlobUrl(src) {
+  if (videoBlobCache[src]) return Promise.resolve(videoBlobCache[src])
+  return fetch(src)
+    .then(r => r.blob())
+    .then(blob => {
+      videoBlobCache[src] = URL.createObjectURL(blob)
+      return videoBlobCache[src]
+    })
+    .catch(() => src)
+}
+
 function CountdownDisplay({ value }) {
   return (
     <div className="countdown">
@@ -78,15 +92,43 @@ function CountdownDisplay({ value }) {
   )
 }
 
-function MoveGifReveal({ move, label, bust, direction }) {
+function MoveReveal({ move, label, direction, onComplete }) {
   const base = import.meta.env.BASE_URL
-  const gif = MOVES[move]?.gif
-  if (!gif) return null
+  const videoPath = MOVES[move]?.video
+  const duration = MOVES[move]?.videoDuration ?? 3000
+  const fullUrl = videoPath ? `${base}${videoPath}` : null
+  const [src, setSrc] = useState(fullUrl ? (videoBlobCache[fullUrl] ?? null) : null)
+  const firedRef = useRef(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    if (!fullUrl || src) return
+    let cancelled = false
+    getVideoBlobUrl(fullUrl).then(url => {
+      if (!cancelled) setSrc(url)
+    })
+    return () => { cancelled = true }
+  }, [fullUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+  if (!videoPath || !src) return null
   return (
-    <div className={`gif-reveal gif-reveal--${direction}`}>
-      <span className="gif-reveal-label">{label}</span>
-      <img className="move-gif" src={`${base}${gif}?${bust}`} alt={MOVES[move]?.name} />
-      <span className="gif-reveal-name">{MOVES[move]?.name}</span>
+    <div className={`move-reveal-anim move-reveal-anim--${direction}`}>
+      <span className="move-reveal-anim-label">{label}</span>
+      <video
+        className="move-video"
+        src={src}
+        autoPlay
+        muted
+        playsInline
+        onPlaying={() => {
+          if (firedRef.current) return
+          firedRef.current = true
+          if (onComplete) timerRef.current = setTimeout(onComplete, duration)
+        }}
+      />
+      <span className="move-reveal-anim-name">{MOVES[move]?.name}</span>
     </div>
   )
 }
@@ -142,7 +184,7 @@ function MatchOverDisplay({ matchWinner, playerScore, cpuScore, matchTarget, pla
       </p>
 
       {playerWins && (
-        <img className="championship-img" src={`${base}images/championship.png`} alt="Championship belt" />
+        <img className="championship-img" src={cachedSrc(`${base}images/championship.png`)} alt="Championship belt" />
       )}
 
       {playerWins && (
@@ -171,54 +213,53 @@ function MatchOverDisplay({ matchWinner, playerScore, cpuScore, matchTarget, pla
   )
 }
 
-// Phases: 'countdown' → 'player_gif' → 'cpu_gif' → null (result)
+// Phases: 'countdown' → 'player_video' → 'cpu_video' → null (result)
 export default function GameScreen({ state, audio, onPlayerChooses, onNextRound, onRematch, onMenu }) {
   const [phase, setPhase] = useState(null)
   const [countdownValue, setCountdownValue] = useState(3)
   const [headerScores, setHeaderScores] = useState({ player: 0, cpu: 0 })
-  const [gifBust, setGifBust] = useState(0)
-
   useLayoutEffect(() => {
     if (state.roundState === 'PLAYER_CHOOSING') {
       setHeaderScores({ player: state.playerScore, cpu: state.cpuScore })
     } else if (state.roundState === 'SHOWING_RESULT') {
       setPhase('countdown')
       setCountdownValue(3)
-      setGifBust(prev => prev + 1)
     }
   }, [state.roundState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (state.roundState !== 'SHOWING_RESULT') return
     const base = import.meta.env.BASE_URL
-    const playerGif = MOVES[state.playerMove]?.gif
-    const cpuGif = MOVES[state.cpuMove]?.gif
-    if (playerGif) new Image().src = `${base}${playerGif}?p${gifBust}`
-    if (cpuGif) new Image().src = `${base}${cpuGif}?c${gifBust}`
-    const playerGifDur = MOVES[state.playerMove]?.gifDuration ?? 3000
-    const cpuGifDur = MOVES[state.cpuMove]?.gifDuration ?? 3000
+    MOVE_KEYS.forEach(key => {
+      const src = MOVES[key]?.video
+      if (src) getVideoBlobUrl(`${base}${src}`)
+    })
+  }, [])
+
+  useEffect(() => {
+    if (state.roundState !== 'SHOWING_RESULT') return
     const timers = [
       setTimeout(() => setCountdownValue(2), 600),
       setTimeout(() => setCountdownValue(1), 1200),
-      setTimeout(() => setPhase('player_gif'), 1800),
-      setTimeout(() => setPhase('cpu_gif'), 1800 + playerGifDur),
-      setTimeout(() => {
-        setPhase(null)
-        setHeaderScores({ player: state.playerScore, cpu: state.cpuScore })
-        if (state.matchWinner === 'PLAYER_WINS' || state.roundResult === 'PLAYER_WINS') audio.onWin()
-        else if (state.matchWinner === 'CPU_WINS' || state.roundResult === 'CPU_WINS') audio.onLose()
-        else audio.onDraw()
-      }, 1800 + playerGifDur + cpuGifDur),
+      setTimeout(() => setPhase('player_video'), 1800),
     ]
     return () => timers.forEach(clearTimeout)
   }, [state.roundState]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function finishReveal() {
+    setPhase(null)
+    setHeaderScores({ player: state.playerScore, cpu: state.cpuScore })
+    if (state.matchWinner === 'PLAYER_WINS' || state.roundResult === 'PLAYER_WINS') audio.onWin()
+    else if (state.matchWinner === 'CPU_WINS' || state.roundResult === 'CPU_WINS') audio.onLose()
+    else audio.onDraw()
+  }
+
   const playerWrestler = state.playerCharacter + 1
   const cpuWrestler = state.cpuCharacter + 1
   const showResult = state.roundState === 'SHOWING_RESULT' && phase === null
+  const isRevealing = phase === 'player_video' || phase === 'cpu_video'
 
   return (
-    <div className="screen">
+    <div className="screen" onClick={isRevealing ? finishReveal : undefined}>
       <ScoreHeader
         playerScore={headerScores.player}
         cpuScore={headerScores.cpu}
@@ -234,12 +275,22 @@ export default function GameScreen({ state, audio, onPlayerChooses, onNextRound,
         <CountdownDisplay value={countdownValue} />
       )}
 
-      {phase === 'player_gif' && (
-        <MoveGifReveal move={state.playerMove} label="YOU CHOSE" bust={`p${gifBust}`} direction="left" />
+      {phase === 'player_video' && (
+        <MoveReveal
+          move={state.playerMove}
+          label="YOU CHOSE"
+          direction="left"
+          onComplete={() => setPhase('cpu_video')}
+        />
       )}
 
-      {phase === 'cpu_gif' && (
-        <MoveGifReveal move={state.cpuMove} label="CPU CHOSE" bust={`c${gifBust}`} direction="right" />
+      {phase === 'cpu_video' && (
+        <MoveReveal
+          move={state.cpuMove}
+          label="CPU CHOSE"
+          direction="right"
+          onComplete={finishReveal}
+        />
       )}
 
       {showResult && !state.matchWinner && (

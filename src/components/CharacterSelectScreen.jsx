@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import RetroButton from './RetroButton.jsx'
+import { cachedSrc } from '../game/imageCache.js'
 
 const WRESTLERS = [1, 2, 3, 4, 5]
 
@@ -25,7 +26,7 @@ export default function CharacterSelectScreen({ onStart, onBack }) {
             className={`wrestler-card${selected === i - 1 ? ' selected' : ''}`}
             onClick={() => setSelected(i - 1)}
           >
-            <img src={`${base}images/wrestler_${i}.jpeg`} alt={`Wrestler ${i}`} />
+            <img src={cachedSrc(`${base}images/wrestler_${i}.jpeg`)} alt={`Wrestler ${i}`} />
           </div>
         ))}
         <div className="fifth-wrestler-wrap">
@@ -33,7 +34,7 @@ export default function CharacterSelectScreen({ onStart, onBack }) {
             className={`wrestler-card${selected === 4 ? ' selected' : ''}`}
             onClick={() => setSelected(4)}
           >
-            <img src={`${base}images/wrestler_5.jpeg`} alt="Wrestler 5" />
+            <img src={cachedSrc(`${base}images/wrestler_5.jpeg`)} alt="Wrestler 5" />
           </div>
         </div>
       </div>

@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import RetroButton from './RetroButton.jsx'
 import { MOVES, MOVE_KEYS } from '../game/moves.js'
+import { cachedSrc } from '../game/imageCache.js'
 import {
   subscribeToRoom, setCharacter, startGame,
   submitMove, resolveRound, advanceRound, rematch, deleteRoom,
@@ -26,7 +27,7 @@ function WrestlerIcon({ wrestler, flip }) {
   return (
     <img
       className="score-icon"
-      src={`${base}images/wrestler_${wrestler}_icon.jpeg`}
+      src={cachedSrc(`${base}images/wrestler_${wrestler}_icon.jpeg`)}
       alt=""
       style={flip ? { transform: 'scaleX(-1)' } : undefined}
     />
@@ -107,7 +108,7 @@ function CharacterSelectPhase({ room, roomCode, playerRole }) {
             className={`wrestler-card${selected === i - 1 ? ' selected' : ''}`}
             onClick={() => !iConfirmed && setSelected(i - 1)}
           >
-            <img src={`${base}images/wrestler_${i}.jpeg`} alt={`Wrestler ${i}`} />
+            <img src={cachedSrc(`${base}images/wrestler_${i}.jpeg`)} alt={`Wrestler ${i}`} />
           </div>
         ))}
         <div className="fifth-wrestler-wrap">
@@ -115,7 +116,7 @@ function CharacterSelectPhase({ room, roomCode, playerRole }) {
             className={`wrestler-card${selected === 4 ? ' selected' : ''}`}
             onClick={() => !iConfirmed && setSelected(4)}
           >
-            <img src={`${base}images/wrestler_5.jpeg`} alt="Wrestler 5" />
+            <img src={cachedSrc(`${base}images/wrestler_5.jpeg`)} alt="Wrestler 5" />
           </div>
         </div>
       </div>
@@ -168,17 +169,58 @@ function ChoosingPhase({ room, roomCode, playerRole }) {
   )
 }
 
-// ── GIF reveal helper ────────────────────────────────────────────────────
+// ── Video reveal helper ──────────────────────────────────────────────────
 
-function MoveGifReveal({ move, label, bust, direction }) {
+const videoBlobCache = {}
+
+function getVideoBlobUrl(src) {
+  if (videoBlobCache[src]) return Promise.resolve(videoBlobCache[src])
+  return fetch(src)
+    .then(r => r.blob())
+    .then(blob => {
+      videoBlobCache[src] = URL.createObjectURL(blob)
+      return videoBlobCache[src]
+    })
+    .catch(() => src)
+}
+
+function MoveReveal({ move, label, direction, onComplete }) {
   const base = import.meta.env.BASE_URL
-  const gif = MOVES[move]?.gif
-  if (!gif) return null
+  const videoPath = MOVES[move]?.video
+  const duration = MOVES[move]?.videoDuration ?? 3000
+  const fullUrl = videoPath ? `${base}${videoPath}` : null
+  const [src, setSrc] = useState(fullUrl ? (videoBlobCache[fullUrl] ?? null) : null)
+  const firedRef = useRef(false)
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    if (!fullUrl || src) return
+    let cancelled = false
+    getVideoBlobUrl(fullUrl).then(url => {
+      if (!cancelled) setSrc(url)
+    })
+    return () => { cancelled = true }
+  }, [fullUrl]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+  if (!videoPath || !src) return null
   return (
-    <div className={`gif-reveal gif-reveal--${direction}`}>
-      <span className="gif-reveal-label">{label}</span>
-      <img className="move-gif" src={`${base}${gif}?${bust}`} alt={MOVES[move]?.name} />
-      <span className="gif-reveal-name">{MOVES[move]?.name}</span>
+    <div className={`move-reveal-anim move-reveal-anim--${direction}`}>
+      <span className="move-reveal-anim-label">{label}</span>
+      <video
+        className="move-video"
+        src={src}
+        autoPlay
+        muted
+        playsInline
+        onPlaying={() => {
+          if (firedRef.current) return
+          firedRef.current = true
+          if (onComplete) timerRef.current = setTimeout(onComplete, duration)
+        }}
+      />
+      <span className="move-reveal-anim-name">{MOVES[move]?.name}</span>
     </div>
   )
 }
@@ -189,26 +231,19 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
   const { p1Move, p2Move, result } = room.round
   const myMove  = playerRole === 'p1' ? p1Move : p2Move
   const oppMove = playerRole === 'p1' ? p2Move : p1Move
-  const [phase, setPhase] = useState('player_gif')
+  const [phase, setPhase] = useState('player_video')
 
   useLayoutEffect(() => {
-    setPhase('player_gif')
+    setPhase('player_video')
   }, [room.roundNumber])
 
   useEffect(() => {
     const base = import.meta.env.BASE_URL
-    const myGif = MOVES[myMove]?.gif
-    const oppGif = MOVES[oppMove]?.gif
-    if (myGif) new Image().src = `${base}${myGif}?p${room.roundNumber}`
-    if (oppGif) new Image().src = `${base}${oppGif}?c${room.roundNumber}`
-    const myDur  = MOVES[myMove]?.gifDuration ?? 3000
-    const oppDur = MOVES[oppMove]?.gifDuration ?? 3000
-    const timers = [
-      setTimeout(() => setPhase('opp_gif'), myDur),
-      setTimeout(() => setPhase('result'), myDur + oppDur),
-    ]
-    return () => timers.forEach(clearTimeout)
-  }, [room.roundNumber]) // eslint-disable-line react-hooks/exhaustive-deps
+    MOVE_KEYS.forEach(key => {
+      const src = MOVES[key]?.video
+      if (src) getVideoBlobUrl(`${base}${src}`)
+    })
+  }, [])
 
   const outcome =
     result === 'draw'    ? 'draw' :
@@ -222,12 +257,26 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
     await advanceRound(roomCode, room.roundNumber)
   }
 
-  if (phase === 'player_gif') {
-    return <MoveGifReveal move={myMove} label="YOU CHOSE" bust={`p${room.roundNumber}`} direction="left" />
+  if (phase === 'player_video') {
+    return (
+      <MoveReveal
+        move={myMove}
+        label="YOU CHOSE"
+        direction="left"
+        onComplete={() => setPhase('opp_video')}
+      />
+    )
   }
 
-  if (phase === 'opp_gif') {
-    return <MoveGifReveal move={oppMove} label="OPP CHOSE" bust={`c${room.roundNumber}`} direction="right" />
+  if (phase === 'opp_video') {
+    return (
+      <MoveReveal
+        move={oppMove}
+        label="OPP CHOSE"
+        direction="right"
+        onComplete={() => setPhase('result')}
+      />
+    )
   }
 
   return (
@@ -288,7 +337,7 @@ function MatchOverPhase({ room, roomCode, playerRole, isP1, onLeave }) {
         {playerWon ? 'YOU WIN!' : 'YOU LOSE'}
       </p>
       {playerWon && (
-        <img className="championship-img" src={`${base}images/championship.png`} alt="Championship belt" />
+        <img className="championship-img" src={cachedSrc(`${base}images/championship.png`)} alt="Championship belt" />
       )}
       <p className="match-score">
         {playerRole === 'p1' ? room.p1Score : room.p2Score}

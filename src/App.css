@@ -285,7 +285,7 @@ body {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
-.gif-reveal {
+.move-reveal-anim {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -294,27 +294,27 @@ body {
   justify-content: center;
   overflow: hidden;
 }
-.gif-reveal--left {
+.move-reveal-anim--left {
   animation: slide-from-left 0.4s ease-out;
 }
-.gif-reveal--right {
+.move-reveal-anim--right {
   animation: slide-from-right 0.4s ease-out;
 }
-.gif-reveal-label {
+.move-reveal-anim-label {
   font-size: 14px;
   font-weight: 700;
   letter-spacing: 3px;
   color: var(--silver-muted);
   text-transform: uppercase;
 }
-.gif-reveal-name {
+.move-reveal-anim-name {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: 2px;
   color: var(--gold);
   text-transform: uppercase;
 }
-.move-gif {
+.move-video {
   width: 100%;
   max-width: 280px;
   height: auto;

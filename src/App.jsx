@@ -1,4 +1,4 @@
-import { useReducer, useCallback, useState } from 'react'
+import { useReducer, useCallback, useState, useEffect } from 'react'
 import ModeSelectScreen from './components/ModeSelectScreen.jsx'
 import CharacterSelectScreen from './components/CharacterSelectScreen.jsx'
 import GameScreen from './components/GameScreen.jsx'
@@ -9,6 +9,7 @@ import { resolveRound } from './game/moves.js'
 import { chooseCpuMove } from './game/cpuAI.js'
 import { recordMatch } from './game/stats.js'
 import useAudio from './hooks/useAudio.js'
+import { preloadImage } from './game/imageCache.js'
 
 const initial = {
   screen: 'MODE_SELECT',
@@ -97,7 +98,7 @@ function reducer(state, action) {
         bestOf: state.bestOf,
         matchTarget: state.matchTarget,
         playerCharacter: state.playerCharacter,
-        cpuCharacter: Math.floor(Math.random() * 5),
+        cpuCharacter: state.cpuCharacter,
       }
 
     case 'GO_HISTORY':
@@ -121,6 +122,15 @@ export default function App() {
   const [state, dispatch] = useReducer(reducer, initial)
   const [mpInfo, setMpInfo] = useState(null)
   const audio = useAudio()
+
+  useEffect(() => {
+    const base = import.meta.env.BASE_URL
+    for (let i = 1; i <= 5; i++) {
+      preloadImage(`${base}images/wrestler_${i}.jpeg`)
+      preloadImage(`${base}images/wrestler_${i}_icon.jpeg`)
+    }
+    preloadImage(`${base}images/championship.png`)
+  }, [])
 
   const handleModeStart = useCallback(() => {
     audio.onModeSelected()
