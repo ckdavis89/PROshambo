@@ -260,6 +260,7 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
   if (phase === 'player_video') {
     return (
       <MoveReveal
+        key="player"
         move={myMove}
         label="YOU CHOSE"
         direction="left"
@@ -271,6 +272,7 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
   if (phase === 'opp_video') {
     return (
       <MoveReveal
+        key="opp"
         move={oppMove}
         label="OPP CHOSE"
         direction="right"
