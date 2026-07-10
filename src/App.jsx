@@ -194,6 +194,7 @@ export default function App() {
         <MultiplayerGameScreen
           roomCode={mpInfo.roomCode}
           playerRole={mpInfo.playerRole}
+          audio={audio}
           onLeave={() => {
             setMpInfo(null)
             dispatch({ type: 'GO_MODE_SELECT' })

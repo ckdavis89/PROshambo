@@ -4,7 +4,7 @@ import { MOVES, MOVE_KEYS } from '../game/moves.js'
 import { cachedSrc } from '../game/imageCache.js'
 import {
   subscribeToRoom, setCharacter, startGame,
-  submitMove, resolveRound, advanceRound, rematch, deleteRoom,
+  submitMove, resolveRound, advanceRound, finishMatch, rematch, deleteRoom,
 } from '../game/room.js'
 import { recordOnlineMatch } from '../game/stats.js'
 
@@ -36,11 +36,11 @@ function WrestlerIcon({ wrestler, flip }) {
 
 // ── Score header ──────────────────────────────────────────────────────────
 
-function ScoreHeader({ room, playerRole }) {
+function ScoreHeader({ room, playerRole, scores }) {
   const myChar   = (playerRole === 'p1' ? room.p1Character : room.p2Character) + 1
   const oppChar  = (playerRole === 'p1' ? room.p2Character : room.p1Character) + 1
-  const myScore  = playerRole === 'p1' ? room.p1Score : room.p2Score
-  const oppScore = playerRole === 'p1' ? room.p2Score : room.p1Score
+  const myScore  = playerRole === 'p1' ? scores.p1 : scores.p2
+  const oppScore = playerRole === 'p1' ? scores.p2 : scores.p1
   const myFlip   = !FACES_RIGHT.has(myChar)
   const oppFlip  = FACES_RIGHT.has(oppChar)
 
@@ -132,11 +132,12 @@ function CharacterSelectPhase({ room, roomCode, playerRole }) {
 
 // ── Round: choosing ───────────────────────────────────────────────────────
 
-function ChoosingPhase({ room, roomCode, playerRole }) {
+function ChoosingPhase({ room, roomCode, playerRole, audio }) {
   const myMove = playerRole === 'p1' ? room.round.p1Move : room.round.p2Move
   const [submitting, setSubmitting] = useState(false)
 
   async function handleMove(move) {
+    audio.onMoveTapped()
     setSubmitting(true)
     await submitMove(roomCode, playerRole, move)
     setSubmitting(false)
@@ -227,7 +228,7 @@ function MoveReveal({ move, label, direction, onComplete }) {
 
 // ── Round: revealing ──────────────────────────────────────────────────────
 
-function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
+function RevealingPhase({ room, roomCode, playerRole, isP1, audio, onResult }) {
   const { p1Move, p2Move, result } = room.round
   const myMove  = playerRole === 'p1' ? p1Move : p2Move
   const oppMove = playerRole === 'p1' ? p2Move : p1Move
@@ -252,6 +253,15 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
 
   const headlineText  = outcome === 'win' ? 'YOU WIN!' : outcome === 'lose' ? 'YOU LOSE' : 'DRAW'
   const headlineClass = `result-headline--${outcome === 'win' ? 'win' : outcome === 'lose' ? 'lose' : 'draw'}`
+
+  useEffect(() => {
+    if (phase !== 'result') return
+    onResult()
+    if (outcome === 'win') audio.onWin()
+    else if (outcome === 'lose') audio.onLose()
+    else audio.onDraw()
+    if (room.matchWinner && isP1) finishMatch(roomCode)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleNext() {
     await advanceRound(roomCode, room.roundNumber)
@@ -308,7 +318,7 @@ function RevealingPhase({ room, roomCode, playerRole, isP1 }) {
 
 // ── Match over ────────────────────────────────────────────────────────────
 
-function MatchOverPhase({ room, roomCode, playerRole, isP1, onLeave }) {
+function MatchOverPhase({ room, roomCode, playerRole, isP1, onLeave, moveSummary }) {
   const base = import.meta.env.BASE_URL
   const playerWon = room.matchWinner === playerRole
   const [rematching, setRematching] = useState(false)
@@ -346,6 +356,17 @@ function MatchOverPhase({ room, roomCode, playerRole, isP1, onLeave }) {
         {' — '}
         {playerRole === 'p1' ? room.p2Score : room.p1Score}
       </p>
+      {Object.keys(moveSummary).length > 0 && (
+        <div className="move-summary">
+          <p className="move-summary-title">YOUR MOVES</p>
+          {MOVE_KEYS.map(key => (
+            <div key={key} className="move-summary-row">
+              <span className="move-summary-name">{MOVES[key].shortName}</span>
+              <span className="move-summary-count">{moveSummary[key] || 0}</span>
+            </div>
+          ))}
+        </div>
+      )}
       <div className="match-over-buttons">
         {isP1
           ? <RetroButton variant="gold" onClick={handleRematch} disabled={rematching}>
@@ -361,12 +382,38 @@ function MatchOverPhase({ room, roomCode, playerRole, isP1, onLeave }) {
 
 // ── Root component ────────────────────────────────────────────────────────
 
-export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave }) {
+export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave, audio }) {
   const [room, setRoom] = useState(null)
+  const [roomClosed, setRoomClosed] = useState(false)
   const isP1 = playerRole === 'p1'
   const resolving = useRef(false)
+  const [moveHistory, setMoveHistory] = useState([])
+  const recordedRound = useRef(0)
+  const [headerScores, setHeaderScores] = useState({ p1: 0, p2: 0 })
+  const hasConnected = useRef(false)
 
-  useEffect(() => subscribeToRoom(roomCode, setRoom), [roomCode])
+  useEffect(() => subscribeToRoom(roomCode, (data) => {
+    if (data) {
+      hasConnected.current = true
+      setRoom(data)
+    } else if (hasConnected.current) {
+      setRoomClosed(true)
+    }
+  }), [roomCode])
+
+  // Hold the header score fixed until the move-reveal video finishes and the round
+  // result is shown (see onResult below), so the score doesn't spoil the result.
+  // Also (re)sync on round/match start in case a round is entered mid-reveal.
+  useLayoutEffect(() => {
+    if (!room) return
+    if (room.round.phase === 'choosing' || room.phase === 'finished') {
+      setHeaderScores({ p1: room.p1Score, p2: room.p2Score })
+    }
+  }, [room?.round?.phase, room?.roundNumber, room?.phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  function handleRevealResult() {
+    setHeaderScores({ p1: room.p1Score, p2: room.p2Score })
+  }
 
   // P1 only: start game when both characters are set
   useEffect(() => {
@@ -388,6 +435,32 @@ export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave })
     }
   }, [room?.round?.p1Move, room?.round?.p2Move])
 
+  // Track own move history across the match, for the match-over breakdown
+  useEffect(() => {
+    if (!room) return
+    if (room.phase === 'waiting' || room.phase === 'character_select' ||
+        (room.phase === 'playing' && room.roundNumber === 1 && room.round.phase === 'choosing')) {
+      setMoveHistory([])
+      recordedRound.current = 0
+      return
+    }
+    if (room.phase === 'playing' && room.round.phase === 'revealing' &&
+        recordedRound.current !== room.roundNumber) {
+      recordedRound.current = room.roundNumber
+      const myMove = playerRole === 'p1' ? room.round.p1Move : room.round.p2Move
+      setMoveHistory(prev => [...prev, myMove])
+    }
+  }, [room?.phase, room?.round?.phase, room?.roundNumber]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (roomClosed) {
+    return (
+      <div className="screen" style={{ alignItems: 'center', justifyContent: 'center' }}>
+        <p className="section-label">OPPONENT LEFT THE ROOM</p>
+        <RetroButton onClick={onLeave}>MAIN MENU</RetroButton>
+      </div>
+    )
+  }
+
   if (!room) {
     return (
       <div className="screen" style={{ alignItems: 'center', justifyContent: 'center' }}>
@@ -397,6 +470,7 @@ export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave })
   }
 
   const showCharSelect = room.phase === 'waiting' || room.phase === 'character_select'
+  const moveSummary = moveHistory.reduce((acc, m) => ({ ...acc, [m]: (acc[m] || 0) + 1 }), {})
 
   return (
     <div className="screen">
@@ -406,25 +480,26 @@ export default function MultiplayerGameScreen({ roomCode, playerRole, onLeave })
 
       {room.phase === 'playing' && (
         <>
-          <ScoreHeader room={room} playerRole={playerRole} />
+          <ScoreHeader room={room} playerRole={playerRole} scores={headerScores} />
           {room.round.phase === 'choosing' && (
-            <ChoosingPhase room={room} roomCode={roomCode} playerRole={playerRole} />
+            <ChoosingPhase room={room} roomCode={roomCode} playerRole={playerRole} audio={audio} />
           )}
           {room.round.phase === 'revealing' && (
-            <RevealingPhase room={room} roomCode={roomCode} playerRole={playerRole} isP1={isP1} />
+            <RevealingPhase room={room} roomCode={roomCode} playerRole={playerRole} isP1={isP1} audio={audio} onResult={handleRevealResult} />
           )}
         </>
       )}
 
       {room.phase === 'finished' && (
         <>
-          <ScoreHeader room={room} playerRole={playerRole} />
+          <ScoreHeader room={room} playerRole={playerRole} scores={headerScores} />
           <MatchOverPhase
             room={room}
             roomCode={roomCode}
             playerRole={playerRole}
             isP1={isP1}
             onLeave={onLeave}
+            moveSummary={moveSummary}
           />
         </>
       )}

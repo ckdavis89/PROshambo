@@ -71,7 +71,7 @@ export async function resolveRound(code, room) {
     'round/result': result,
     p1Score: newP1Score,
     p2Score: newP2Score,
-    ...(matchWinner ? { matchWinner, phase: 'finished' } : {}),
+    ...(matchWinner ? { matchWinner } : {}),
   })
 }
 
@@ -82,11 +82,13 @@ export async function advanceRound(code, roundNumber) {
   })
 }
 
+export async function finishMatch(code) {
+  await update(ref(db, `rooms/${code}`), { phase: 'finished' })
+}
+
 export async function rematch(code, bestOf) {
   await update(ref(db, `rooms/${code}`), {
-    phase: 'character_select',
-    p1Character: -1,
-    p2Character: -1,
+    phase: 'playing',
     p1Score: 0,
     p2Score: 0,
     roundNumber: 1,
@@ -101,6 +103,6 @@ export async function deleteRoom(code) {
 
 export function subscribeToRoom(code, callback) {
   const roomRef = ref(db, `rooms/${code}`)
-  onValue(roomRef, snap => { if (snap.exists()) callback(snap.val()) })
+  onValue(roomRef, snap => callback(snap.exists() ? snap.val() : null))
   return () => off(roomRef)
 }
