@@ -182,6 +182,7 @@ export default function App() {
       return (
         <MultiplayerLobbyScreen
           onJoined={(code, role) => {
+            audio.onModeSelected()
             setMpInfo({ roomCode: code, playerRole: role })
             dispatch({ type: 'GO_MULTIPLAYER_GAME' })
           }}
